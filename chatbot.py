@@ -1,39 +1,33 @@
 import streamlit as st
-import openai
+from openai import OpenAI
 
-# Setze den Titel und das Icon für deine Seite
-st.set_page_config(page_title="Pforzheim Chatbot", page_icon="🤖")
-st.title("🤖 Pforzheim Chatbot")
-st.markdown("Stelle mir Fragen rund um die Stadt Pforzheim!")
+# Titel der App
+st.title("Pforzheim-Chatbot")
+st.write("Stelle mir Fragen zur Stadt Pforzheim! 🏙️")
 
-# API-Key von OpenAI (über Secrets von Streamlit gespeichert)
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+# OpenAI-Client initialisieren (neue API-Syntax!)
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# Chatverlauf in der Sitzung speichern
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "system", "content": "Du bist ein hilfreicher Assistent für die Stadt Pforzheim."}]
+# Texteingabe vom Benutzer
+user_input = st.text_input("Deine Frage:")
 
-# Zeige den bisherigen Chatverlauf
-for msg in st.session_state.messages[1:]:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Wenn Nutzer etwas eingibt
+if user_input:
+    with st.spinner("Denke nach..."):
 
-# Eingabefeld für den Benutzer
-prompt = st.chat_input("Was möchtest du wissen?")
-if prompt:
-    # Speichern der Eingabe im Verlauf
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+        # ChatPrompt definieren
+        messages = [
+            {"role": "system", "content": "Du bist ein hilfreicher Stadt-Informationsassistent für Pforzheim."},
+            {"role": "user", "content": user_input}
+        ]
 
-    # Antwort von OpenAI generieren
-    response = openai.ChatCompletion.create(
-        model="gpt-4",  # alternativ: gpt-3.5-turbo für weniger Kosten
-        messages=st.session_state.messages
-    )
-    reply = response.choices[0].message.content
-    st.session_state.messages.append({"role": "assistant", "content": reply})
+        # Antwort generieren
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            temperature=0.7
+        )
 
-    # Antwort anzeigen
-    with st.chat_message("assistant"):
-        st.markdown(reply)
+        # Antwort anzeigen
+        answer = response.choices[0].message.content
+        st.success(answer)
