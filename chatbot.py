@@ -1,33 +1,51 @@
 import streamlit as st
-from openai import OpenAI
+import openai
+import time
+from openai import RateLimitError, AuthenticationError, APIConnectionError, APIError
 
-# Titel der App
-st.title("Pforzheim-Chatbot")
-st.write("Stelle mir Fragen zur Stadt Pforzheim! 🏙️")
+# API-Key aus Streamlit Secrets laden
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# OpenAI-Client initialisieren (neue API-Syntax!)
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# Streamlit UI
+st.title("💬 Pforzheim Chatbot")
+user_input = st.text_input("Frage zur Stadt Pforzheim:")
 
-# Texteingabe vom Benutzer
-user_input = st.text_input("Deine Frage:")
-
-# Wenn Nutzer etwas eingibt
 if user_input:
-    with st.spinner("Denke nach..."):
-
-        # ChatPrompt definieren
+    with st.spinner("Antwort wird geladen..."):
         messages = [
-            {"role": "system", "content": "Du bist ein hilfreicher Stadt-Informationsassistent für Pforzheim."},
-            {"role": "user", "content": user_input}
+            {"role": "system", "content": "Du bist ein hilfreicher Chatbot mit Informationen über die Stadt Pforzheim."},
+            {"role": "user", "content": user_input},
         ]
 
-        # Antwort generieren
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            temperature=0.7
-        )
+        # Fehlerbehandlung mit Retry (max. 3 Versuche)
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=messages,
+                    temperature=0.5,
+                )
+                reply = response.choices[0].message.content
+                st.success(reply)
+                break  # Erfolgreich -> Schleife beenden
 
-        # Antwort anzeigen
-        answer = response.choices[0].message.content
-        st.success(answer)
+            except RateLimitError:
+                st.warning("⚠️ Zu viele Anfragen. Warte 10 Sekunden...")
+                time.sleep(10)  # Wartezeit vor erneutem Versuch
+
+            except AuthenticationError:
+                st.error("🚫 Ungültiger API-Key. Bitte überprüfe deine Einstellungen.")
+                break
+
+            except APIConnectionError:
+                st.error("🔌 Verbindungsfehler zu OpenAI. Prüfe deine Internetverbindung.")
+                break
+
+            except APIError:
+                st.error("❗ Interner Fehler bei OpenAI. Bitte versuche es später erneut.")
+                break
+
+        else:
+            st.error("⏱️ Anfrage fehlgeschlagen nach mehreren Versuchen. Bitte später erneut versuchen.")
+
